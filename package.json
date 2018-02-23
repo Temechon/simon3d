@@ -1,0 +1,19 @@
+{
+  "name": "simon3d",
+  "version": "1.0.0",
+  "devDependencies": {
+    "browser-sync": "^2.18.12",
+    "grunt": "^1.0.1",
+    "grunt-contrib-clean": "^1.1.0",
+    "grunt-contrib-compress": "^1.4.3",
+    "grunt-contrib-copy": "^1.0.0",
+    "grunt-contrib-uglify": "^3.0.1",
+    "grunt-contrib-watch": "latest",
+    "grunt-ts": "^6.0.0-beta.16",
+    "jit-grunt": "latest",
+    "typescript": "^2.6.2"
+  },
+  "scripts": {
+    "start": "browser-sync start --server --files **/**/*.js css/* --https"
+  }
+}

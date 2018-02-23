@@ -1,0 +1,10 @@
+node_modules
+.tmp
+*.map
+.history
+js/*
+!js/libs
+*.zip
+dist/*
+.tscache
+js/main.js
