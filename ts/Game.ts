@@ -6,13 +6,18 @@ class Game {
     private _buttons: Array<BABYLON.AbstractMesh> = [];
     private centerPosition: BABYLON.Vector3;
 
+    private _sounds: Array<BABYLON.Sound> = [];
+
     private sequence: Array<number> = [];
     private runningSequenceIndex = 0;
 
-    private cameraParams = { alpha: -1.57, beta: 0.89 };
+    private cameraParams = { alpha: -1.57, beta: 0.45 };
 
     // True when the player can start to reproduce the sequence
     private _waitForInput: boolean = false;
+
+    private _simonSequence: Array<string> = [];
+    private _userSequence: Array<string> = [];
 
     constructor(canvasId: string) {
 
@@ -29,6 +34,15 @@ class Game {
         this._initScene();
 
         let loader = new BABYLON.AssetsManager(this.scene);
+
+        let addSound = (task: any) => {
+            this._sounds.push(new BABYLON.Sound("", task.data, this.scene));
+        }
+        loader.addBinaryFileTask("Sound 1", "assets/sfx/a_sharp.mp3").onSuccess = addSound.bind(this);
+        loader.addBinaryFileTask("Sound 2", "assets/sfx/c_sharp.mp3").onSuccess = addSound.bind(this);
+        loader.addBinaryFileTask("Sound 3", "assets/sfx/d_sharp.mp3").onSuccess = addSound.bind(this);
+        loader.addBinaryFileTask("Sound 4", "assets/sfx/f_sharp.mp3").onSuccess = addSound.bind(this);
+
         loader.addMeshTask("simon", "", 'assets/', "simon.babylon").onSuccess = (task: BABYLON.MeshAssetTask) => {
 
             // Get buttons
@@ -60,7 +74,7 @@ class Game {
         this.scene = new BABYLON.Scene(this.engine);
 
         let camera = new BABYLON.ArcRotateCamera('', 0, 0, 250, BABYLON.Vector3.Zero(), this.scene);
-        camera.attachControl(this.engine.getRenderingCanvas());
+        // camera.attachControl(this.engine.getRenderingCanvas());
         let light = new BABYLON.HemisphericLight('', new BABYLON.Vector3(0, 1, 0), this.scene);
 
     }
@@ -101,11 +115,33 @@ class Game {
         BABYLON.Animation.CreateAndStartAnimation('', this.scene.activeCamera, 'beta', 60, 100, 0, this.cameraParams.beta, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT, easing);
         BABYLON.Animation.CreateAndStartAnimation('', this.scene.activeCamera, 'radius', 60, 100, 250, radius, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT, easing, this._startGame.bind(this));
 
-        this.scene.onPointerDown = (evt: PointerEvent, pickInfo: BABYLON.PickingInfo) => {
-            console.log(pickInfo.pickedMesh.name);
-            // if (this._waitForInput && pickInfo.hit) {
-            //     console.log(pickInfo.pickedMesh.name);
-            // }
+        this.scene.onPointerDown = async (evt: PointerEvent, pickInfo: BABYLON.PickingInfo) => {
+            if (pickInfo.hit) {
+
+                if (this._waitForInput) {
+                    let buttonName = await this._playButton(this._getButtonIndex(pickInfo.pickedMesh.name));
+                    this._userSequence.push(buttonName);
+                }
+
+                let isButtonOk = this.checkSequences();
+                if (!isButtonOk) {
+                    console.log("game over")
+                    this._waitForInput = false;
+                    // Play lost sound
+                    // Display game over
+                    // try again
+                    return;
+                }
+                else {
+                    console.log("ok !")
+                    if (this._userSequence.length === this._simonSequence.length) {
+                        // add a new button to the sequence
+                        this._gameLoop().then(() => {
+                            this._waitForInput = true;
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -113,6 +149,8 @@ class Game {
         this._waitForInput = false;
         this.runningSequenceIndex = 0;
         this.sequence = [];
+        this._userSequence = [];
+        this._simonSequence = [];
 
         this._gameLoop().then(() => {
             this._waitForInput = true;
@@ -120,35 +158,64 @@ class Game {
 
     }
 
+    /**
+     * Adds a button to the sequence and play the whole sequence
+     */
     private async _gameLoop() {
         this._waitForInput = false;
-        this._addButton();
+        this._userSequence = [];
+        let index = this._addButtonInSequence();
+        this._simonSequence.push(this._buttons[index].name);
 
         for (let i = 0; i < this.sequence.length; i++) {
-            await this._showAnimationWithSound();
-            this.runningSequenceIndex++;
+            let buttonName = await this._playButton(this.sequence[i]);
         }
     }
 
-
-    private _showAnimationWithSound(): Promise<any> {
-        this.scene.stopAllAnimations();
-        return new Promise<any>((resolve, reject) => {
-            let button = this._buttons[this._getNextButtonToPlay()];
-            this.scene.beginAnimation(button, 0, 20, false, 1, resolve.bind(this));
-        });
+    private _getButtonIndex(name: string) {
+        for (let b = 0; b < this._buttons.length; b++) {
+            let button = this._buttons[b];
+            if (button.name === name) {
+                return b;
+            }
+        }
+        return 0;
     }
 
-    private _getNextButtonToPlay() {
-        return this.sequence[this.runningSequenceIndex];
+    /**
+     * Returns the button name played
+     * @param index 
+     */
+    private _playButton(index: number): Promise<string> {
+        return new Promise<string>((resolve, reject) => {
+            let button = this._buttons[index];
+            this._sounds[index].play();
+            this.scene.beginAnimation(button, 0, 20, false, 1.5, resolve.bind(this, button.name));
+        });
     }
 
     /**
      * Adds a button to press to the sequence
      */
-    private _addButton() {
+    private _addButtonInSequence(): number {
         let random = Math.floor(BABYLON.Scalar.RandomRange(0, 4));
         this.sequence.push(random);
+        return random;
+    }
+
+    /**
+     * Returns true if the first item of user sequence i
+     */
+    private checkSequences(): boolean {
+        console.log(this._userSequence);
+        console.log(this._simonSequence);
+        for (let i = 0; i < this._userSequence.length; i++) {
+            let button = this._userSequence[i];
+            if (this._simonSequence[i] !== button) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }
